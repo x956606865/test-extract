@@ -1,10 +1,10 @@
+
 use super::math::std_deviation;
 use super::string::remove_blank;
 use html5ever::rcdom::{Handle, NodeData,RcDom,Node};
 use html5ever::parse_document;
 use std::rc::Rc;
 use html5ever::tendril::TendrilSink;
-
 #[derive(Debug)]
 pub enum NodeTypeEnum {
     Text,
@@ -169,8 +169,20 @@ fn calc_score_child(node:&mut NodeInfo,sd:f64){
 
 
 pub fn get_node_info_from_reqwest_result(handle: &Handle) -> NodeInfo {
-    let node = handle;
+    let mut node = handle;
     let mut info = NodeInfo ::new();
+    let mut is_patch=false;
+    let parent_tag_name= match node.parent.take().unwrap().upgrade().unwrap().data{
+        NodeData::Element {
+            ref name,
+            ..
+        }=>{
+            name.local.to_string()
+        },
+        _=>{
+            String::from("")
+        }
+    };
     match node.data {
         NodeData::Element {
             ref name,
@@ -188,49 +200,66 @@ pub fn get_node_info_from_reqwest_result(handle: &Handle) -> NodeInfo {
         NodeData::Text {
             ref contents
         }=>{
-            info.set_node_type(NodeTypeEnum::Text);
-            info.set_node_text_info(remove_blank(&contents.borrow().to_string()));
+            if parent_tag_name == "div" {
+                is_patch=true;
+                info.set_tag_name(String::from("p"));
+                info.set_node_type(NodeTypeEnum::Element);
+                info.set_p_tag_num(1);
+                info.set_node_text_info(remove_blank(&contents.borrow().to_string()));
+            }else{
+                info.set_node_type(NodeTypeEnum::Text);
+                info.set_node_text_info(remove_blank(&contents.borrow().to_string()));
+            }
         }
         _ => {}
     };
     let mut  child_td_arr=Vec::new();
-    for child in node.children.borrow().iter(){
-        let child_info=get_node_info_from_reqwest_result(child);
-        if child_info.is_valid(){
-            child_td_arr.push(child_info.td);
-            match child_info.node_type {
-                NodeTypeEnum::Element=>{
-                    info.set_tag_num(info.tag_num+child_info.tag_num+1);
-                }
-                _=>{
-                    info.set_tag_num(info.tag_num+child_info.tag_num);
-                }
-            };
+    if is_patch == true{
+        info.set_tag_num(0);
+        info.set_link_tag_num(0);
+        info.set_p_tag_num(0);
+        info.set_link_tag_text_length(0);
+        info.set_td(info.text_length as f32);
+    }else{
+        for child in node.children.borrow().iter(){
+            let child_info=get_node_info_from_reqwest_result(child);
+            if child_info.is_valid(){
+                child_td_arr.push(child_info.td);
+                match child_info.node_type {
+                    NodeTypeEnum::Element=>{
+                        info.set_tag_num(info.tag_num+child_info.tag_num+1);
+                    }
+                    _=>{
+                        info.set_tag_num(info.tag_num+child_info.tag_num);
+                    }
+                };
 
-            info.set_text_length(info.text_length+child_info.text_length);
-            info.set_link_tag_num((info.link_tag_num + child_info.link_tag_num) as i16);
-            info.set_p_tag_num((info.p_tag_num + child_info.p_tag_num) as i16);
-            if info.tag_name=="a".to_string(){
-                info.set_link_tag_text_length(info.text_length as i16);
-            }else{
-                info.set_link_tag_text_length(info.link_tag_text_length+child_info.link_tag_text_length);
+                info.set_text_length(info.text_length+child_info.text_length);
+                info.set_link_tag_num((info.link_tag_num + child_info.link_tag_num) as i16);
+                info.set_p_tag_num((info.p_tag_num + child_info.p_tag_num) as i16);
+                if info.tag_name=="a".to_string(){
+                    info.set_link_tag_text_length(info.text_length as i16);
+                }else{
+                    info.set_link_tag_text_length(info.link_tag_text_length+child_info.link_tag_text_length);
+                }
+                let link_tag_num= match info.tag_name.as_str() {
+                    "a"=>info.link_tag_num-1,
+                    _=>info.link_tag_num
+                };
+                let divided=info.tag_num as i32 - link_tag_num as i32;
+
+                let td=if divided == 0 {
+                    (info.text_length-info.link_tag_text_length as i32)
+                } else {
+                    (info.text_length-info.link_tag_text_length as i32)/divided
+                };
+
+                info.set_td(td as f32);
+                info.add_child(child_info);
             }
-            let link_tag_num= match info.tag_name.as_str() {
-                "a"=>info.link_tag_num-1,
-                _=>info.link_tag_num
-            };
-            let divided=info.tag_num as i32 - link_tag_num as i32;
-
-            let td=if divided == 0 {
-                (info.text_length-info.link_tag_text_length as i32)
-            } else {
-                (info.text_length-info.link_tag_text_length as i32)/divided
-            };
-
-            info.set_td(td as f32);
-            info.add_child(child_info);
         }
     }
+
     return info
 }
 
