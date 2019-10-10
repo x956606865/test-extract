@@ -9,5 +9,3 @@ edition = "2018"
 [dependencies]
 html5ever = "0.24.1"
 reqwest="0.9.21"
-streaming-stats = "0.2"
-num-traits = "0.2"
