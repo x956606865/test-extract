@@ -1,0 +1,13 @@
+[package]
+name = "text_extract"
+version = "0.1.0"
+authors = ["XiaBin <XiaBin@inceptionpad.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+html5ever = "0.24.1"
+reqwest="0.9.21"
+streaming-stats = "0.2"
+num-traits = "0.2"
